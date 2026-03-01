@@ -98,7 +98,7 @@ def fetch_patient_data(patient_id: str) -> dict:
 
     med_ids = [m["id"] for m in data["medications"]]
     if med_ids:
-        ar = client.table("medication_adherence_logs").select("logged_date, taken, notes, medications(name)").in_("medication_id", med_ids).order("logged_date", desc=True).execute()
+        ar = client.table("medication_adherence_logs").select("medication_id, logged_date, taken, notes, medications(name)").in_("medication_id", med_ids).order("logged_date", desc=True).execute()
         data["adherence"] = ar.data or []
 
     apr = client.table("appointments").select("scheduled_at, physician, visit_type, notes").eq("patient_id", patient_id).order("scheduled_at").execute()

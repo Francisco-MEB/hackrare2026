@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { globalCss } from "./theme";
 
 // Shared
@@ -13,6 +13,8 @@ import DeviceData from "./components/shared/patient/DeviceData";
 // Doctor
 import DoctorDashboard from "./components/shared/doctor/DoctorDashboard";
 import DoctorPatientView from "./components/shared/doctor/DoctorPatientView";
+import { getPatients } from "./api";
+
 const patientNav = [
   { id: "home",     icon: "⊞", label: "Dashboard"      },
   { id: "symptoms", icon: "◈", label: "Symptoms"        },
@@ -28,6 +30,19 @@ export default function App() {
   const [role, setRole] = useState(null);
   const [tab, setTab] = useState("home");
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [patientUser, setPatientUser] = useState(null); // { id, name } when role=patient
+
+  useEffect(() => {
+    if (role === "patient") {
+      getPatients()
+        .then((patients) => {
+          if (patients?.length) setPatientUser({ id: patients[0].id, name: patients[0].name });
+        })
+        .catch(() => setPatientUser(null));
+    } else {
+      setPatientUser(null);
+    }
+  }, [role]);
 
   // Login screen
   if (!role) return (
@@ -44,8 +59,8 @@ export default function App() {
 
   const renderContent = () => {
     if (role === "patient") {
-      if (tab === "home")     return <PatientDashboard onNavigate={setTab} />;
-      if (tab === "symptoms") return <SymptomTracker />;
+      if (tab === "home")     return <PatientDashboard patient={patientUser} onNavigate={setTab} />;
+      if (tab === "symptoms") return <SymptomTracker patient={patientUser} />;
       if (tab === "devices")  return <DeviceData />;
 
       // Coming soon (e.g. history)
@@ -73,6 +88,7 @@ export default function App() {
           items={nav}
           active={tab}
           role={role}
+          patient={patientUser}
           onSelect={(id) => { setTab(id); setSelectedPatient(null); }}
           onLogout={() => { setRole(null); setTab("home"); }}
         />

@@ -2,7 +2,7 @@ import { theme } from "../../theme";
 import NavItem from "./NavItem";
 import logo from "../../assets/logo.png";
 
-export default function Sidebar({ items, active, onSelect, role, onLogout }) {
+export default function Sidebar({ items, active, onSelect, role, patient, onLogout }) {
   return (
     <div style={{
       width: "300px", minHeight: "100vh", background: theme.surface,
@@ -31,7 +31,7 @@ export default function Sidebar({ items, active, onSelect, role, onLogout }) {
           </div>
           <div>
             <p style={{ fontSize: "clamp(14px, 1.2vw, 18px)", fontWeight: 600, color: theme.text }}>
-              {role === "patient" ? "Alex Chen" : "Dr. Sarah Kim"}
+              {role === "patient" ? (patient?.name ?? "Patient") : "Dr. Sarah Kim"}
             </p>
             <p style={{ fontSize: "clamp(12px, 1vw, 15px)", color: theme.textLight, textTransform: "capitalize" }}>{role}</p>
           </div>

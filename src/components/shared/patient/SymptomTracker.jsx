@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { theme } from "../../../theme";
+import { postSymptomLogs } from "../../../api";
 
 const CATEGORIES = [
   {
@@ -70,10 +71,12 @@ const initValues = () => {
   return v;
 };
 
-export default function SymptomTracker() {
+export default function SymptomTracker({ patient }) {
   const [activeId, setActiveId] = useState("motor");
   const [values, setValues] = useState(initValues());
   const [comment, setComment] = useState("");
+  const [logging, setLogging] = useState(false);
+  const [lastLog, setLastLog] = useState(null);
 
   const active = CATEGORIES.find(c => c.id === activeId);
 
@@ -100,7 +103,7 @@ export default function SymptomTracker() {
           Symptom Check-In
         </h1>
         <p style={{ color: theme.textMuted, fontSize: "clamp(11px, 1vw, 15px)" }}>
-          Mar 1 · Select a category and rate today's symptoms
+          {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })} · Select a category and rate today's symptoms
         </p>
       </div>
 
@@ -259,17 +262,40 @@ export default function SymptomTracker() {
               lineHeight: 1.5,
             }}
           />
-          <button style={{
-            padding: "clamp(10px, 1.2vh, 16px) clamp(16px, 1.6vw, 24px)",
-            borderRadius: "clamp(8px, 0.8vw, 12px)",
-            background: active.color, color: "white", border: "none",
-            fontWeight: 600, fontSize: "clamp(12px, 1vw, 15px)",
-            cursor: "pointer", fontFamily: "inherit",
-            boxShadow: `0 3px 12px ${active.color}44`,
-            transition: "background 0.3s", flexShrink: 0,
-            alignSelf: "stretch",
-          }}>
-            Log {active.label}
+          <button
+            disabled={!patient?.id || logging}
+            onClick={async () => {
+              if (!patient?.id) return;
+              setLogging(true);
+              try {
+                const entries = active.symptoms.map((s, i) => ({
+                  symptom_name: s.label,
+                  severity: values[s.key] ?? 1,
+                  notes: i === active.symptoms.length - 1 && comment ? comment : null,
+                }));
+                await postSymptomLogs(patient.id, entries);
+                setLastLog(active.label);
+                setValues(initValues());
+                setComment("");
+              } catch (e) {
+                console.error("Failed to log symptoms:", e);
+              } finally {
+                setLogging(false);
+              }
+            }}
+            style={{
+              padding: "clamp(10px, 1.2vh, 16px) clamp(16px, 1.6vw, 24px)",
+              borderRadius: "clamp(8px, 0.8vw, 12px)",
+              background: (patient?.id && !logging) ? active.color : theme.textLight, color: "white", border: "none",
+              fontWeight: 600, fontSize: "clamp(12px, 1vw, 15px)",
+              cursor: patient?.id && !logging ? "pointer" : "not-allowed", fontFamily: "inherit",
+              boxShadow: `0 3px 12px ${active.color}44`,
+              transition: "background 0.3s", flexShrink: 0,
+              alignSelf: "stretch",
+              opacity: patient?.id ? 1 : 0.6,
+            }}
+          >
+            {logging ? "Logging…" : lastLog === active.label ? "Logged ✓" : `Log ${active.label}`}
           </button>
         </div>
       </div>

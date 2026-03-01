@@ -35,6 +35,20 @@ export async function getPatientInterpretation(patientId) {
   return fetchApi(`/patients/${patientId}/interpretation`);
 }
 
+export async function postMedicationAdherence(patientId, medicationId, taken) {
+  return fetchApi(`/patients/${patientId}/adherence`, {
+    method: 'POST',
+    body: JSON.stringify({ medication_id: medicationId, taken }),
+  });
+}
+
+export async function postSymptomLogs(patientId, entries) {
+  return fetchApi(`/patients/${patientId}/symptom-logs`, {
+    method: 'POST',
+    body: JSON.stringify({ entries }),
+  });
+}
+
 export async function chat(patientId, question) {
   const data = await fetchApi('/chat', {
     method: 'POST',

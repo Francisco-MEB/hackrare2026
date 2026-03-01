@@ -25,6 +25,16 @@ class ChatRequest(BaseModel):
     question: str
 
 
+class SymptomLogEntry(BaseModel):
+    symptom_name: str
+    severity: int  # 1-10
+    notes: str | None = None
+
+
+class SymptomLogRequest(BaseModel):
+    entries: list[SymptomLogEntry]
+
+
 class ChatResponse(BaseModel):
     answer: str
 
@@ -155,6 +165,91 @@ def get_patient_interpretation(patient_id: str):
         chain = build_doctor_chain(patient_id=patient_id, streaming=False)
         answer = chain.invoke(INTERPRETATION_PROMPT)
         return {"interpretation": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AdherenceRequest(BaseModel):
+    medication_id: str
+    taken: bool = True
+
+
+@app.post("/patients/{patient_id}/adherence")
+def log_medication_adherence(patient_id: str, body: AdherenceRequest):
+    """Mark a medication as taken or not taken for today."""
+    try:
+        client = get_supabase_client()
+        medication_id = body.medication_id
+        taken = body.taken
+        mr = client.table("medications").select("id").eq("patient_id", patient_id).eq("id", medication_id).maybe_single().execute()
+        if not mr.data:
+            raise HTTPException(status_code=404, detail="Medication not found for this patient")
+        today = datetime.utcnow().date().isoformat()
+        existing = (
+            client.table("medication_adherence_logs")
+            .select("id")
+            .eq("medication_id", medication_id)
+            .eq("logged_date", today)
+            .execute()
+        )
+        if existing.data and len(existing.data) > 0:
+            client.table("medication_adherence_logs").update({"taken": taken}).eq("id", existing.data[0]["id"]).execute()
+        else:
+            client.table("medication_adherence_logs").insert({
+                "medication_id": medication_id,
+                "logged_date": today,
+                "taken": taken,
+                "notes": None,
+            }).execute()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/patients/{patient_id}/symptom-logs")
+def log_symptoms(patient_id: str, request: SymptomLogRequest):
+    """Patient self-reports symptom severity. Looks up or creates symptom for patient's disease."""
+    try:
+        client = get_supabase_client()
+        r = client.table("patients").select("id, disease_id").eq("id", patient_id).maybe_single().execute()
+        if not r.data:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        disease_id = r.data.get("disease_id")
+        if not disease_id:
+            raise HTTPException(status_code=400, detail="Patient has no disease")
+
+        from datetime import datetime
+        now = datetime.utcnow().isoformat() + "Z"
+        inserted = 0
+
+        symr = client.table("symptoms").select("id, name").eq("disease_id", disease_id).execute()
+        existing = {s["name"].lower(): s["id"] for s in (symr.data or [])}
+
+        for entry in request.entries:
+            if not entry.symptom_name or entry.severity < 1 or entry.severity > 10:
+                continue
+            name = entry.symptom_name.strip()
+            symptom_id = existing.get(name.lower())
+            if not symptom_id:
+                ins = client.table("symptoms").insert({"disease_id": disease_id, "name": name}).execute()
+                symptom_id = (ins.data or [{}])[0].get("id") if ins.data else None
+                if symptom_id:
+                    existing[name.lower()] = symptom_id
+            if symptom_id:
+                client.table("symptom_logs").insert({
+                    "patient_id": patient_id,
+                    "symptom_id": symptom_id,
+                    "logged_at": now,
+                    "severity": entry.severity,
+                    "notes": entry.notes or None,
+                    "curated_by": None,
+                }).execute()
+                inserted += 1
+        return {"ok": True, "inserted": inserted}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
