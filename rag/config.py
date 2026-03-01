@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     supabase_service_key: str = SUPABASE_SERVICE_ROLE_KEY
 
     ollama_base_url: str = "http://localhost:11434"
-    doctor_model: str = "gemma3:12b"
-    patient_model: str = "gemma3:12b"
+    doctor_model: str = "hf.co/slplayford/neuro-gemma3-12b:Q8_0"
+    patient_model: str = "hf.co/slplayford/neuro-gemma3-12b:Q8_0"
     ollama_embed_model: str = "nomic-embed-text:latest"  
 
     documents_table: str = "rag_documents"         
