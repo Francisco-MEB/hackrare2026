@@ -6,18 +6,18 @@ Pipeline:
   1. Drop records with no reasoning — they have nothing to teach
   2. Field mapping (question → user turn)
   3. Build model output:
-       Clinical Reasoning: {CoT — the star of the show}
-       Key Considerations: {distilled, non-prescriptive summary from answer}
+       Reasoning: {CoT from metadata.reasoning}
+       Response:  {full answer from database, non-prescriptive}
        CONFIDENCE: HIGH | MODERATE
        {disclaimer}
-  4. NeuraCare style injection on both reasoning and key considerations:
+  4. NeuraCare style injection on both reasoning and response:
        - Strip prescriptive language
        - Reformat source citations
   5. Gemma 3 chat template wrapping
   6. Write JSONL with a single `text` field
 
 Output:
-  gemma3_training.jsonl  — records with reasoning only (~7,273 expected)
+  gemma3_training.jsonl  — records with reasoning only
 """
 
 import json
@@ -37,9 +37,6 @@ DISCLAIMER = (
     "judgement. Always verify against current clinical guidelines and consult "
     "appropriate specialists before making treatment decisions."
 )
-
-# Max bullet points / sentences to extract for Key Considerations
-MAX_CONSIDERATIONS = 4
 
 # ---------------------------------------------------------------------------
 # NeuraCare style rules
@@ -70,13 +67,6 @@ CITATION_GUIDELINE = re.compile(
     re.IGNORECASE,
 )
 
-# Markdown bullet/list line
-BULLET_LINE = re.compile(r'^\s*[-*•]\s+(.+)$')
-# Numbered list line
-NUMBERED_LINE = re.compile(r'^\s*\d+[.)]\s+(.+)$')
-# Markdown header or blockquote — skip these
-SKIP_LINE = re.compile(r'^\s*(#{1,6}\s|>|\*{3,}|-{3,}|`)')
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -106,59 +96,22 @@ def reformat_citations(text: str) -> str:
     return text
 
 
-def extract_key_considerations(answer: str, max_items: int = MAX_CONSIDERATIONS) -> str:
-    """
-    Distil the answer into a short bulleted Key Considerations block.
-
-    Strategy (in order):
-      1. Pull the first `max_items` markdown bullet / numbered-list items.
-      2. If fewer than 2 bullets found, fall back to the first 2 plain sentences.
-
-    Returns a formatted bullet string.
-    """
-    bullets = []
-    for line in answer.splitlines():
-        if SKIP_LINE.match(line):
-            continue
-        m = BULLET_LINE.match(line) or NUMBERED_LINE.match(line)
-        if m:
-            content = m.group(1).strip()
-            # Strip inline markdown bold/italic
-            content = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', content)
-            content = re.sub(r'`([^`]+)`', r'\1', content)
-            if content:
-                bullets.append(content)
-        if len(bullets) >= max_items:
-            break
-
-    # Fallback: first 2 sentences from plain prose
-    if len(bullets) < 2:
-        sentences = re.split(r'(?<=[.!?])\s+', re.sub(r'\s+', ' ', answer).strip())
-        bullets = [s.strip() for s in sentences if len(s.strip()) > 20][:max_items]
-
-    if not bullets:
-        bullets = [answer.strip()[:300]]
-
-    return "\n".join(f"- {b}" for b in bullets)
-
-
 def build_model_output(reasoning: str, answer: str, difficulty) -> str:
     """
     Compose the full model turn:
-      Clinical Reasoning: {cleaned CoT}
-      Key Considerations: {distilled bullets}
-      CONFIDENCE: ...
+      Reasoning: {cleaned CoT from metadata.reasoning}
+      Response:  {full answer from DB, style-cleaned}
+      CONFIDENCE: HIGH | MODERATE
       {disclaimer}
     """
     clean_reasoning = strip_prescriptive(reformat_citations(reasoning.strip()))
-    raw_considerations = extract_key_considerations(answer)
-    clean_considerations = strip_prescriptive(reformat_citations(raw_considerations))
-    confidence = difficulty_to_confidence(difficulty)
+    clean_response  = strip_prescriptive(reformat_citations(answer.strip()))
+    confidence      = difficulty_to_confidence(difficulty)
 
     return (
-        f"Clinical Reasoning:\n{clean_reasoning}\n\n"
-        f"Key Considerations:\n{clean_considerations}\n\n"
-        f"CONFIDENCE: {confidence}\n\n"
+        f"Reasoning:\n{clean_reasoning}\n\n"
+        f"Response:\n{clean_response}\n\n"
+        f"CONFIDENCE: {confidence}\n"
         f"{DISCLAIMER}"
     )
 
@@ -228,8 +181,8 @@ def main():
             r = json.loads(line)
             t = r["text"]
             for marker in ["<start_of_turn>user", "<start_of_turn>model",
-                           "<end_of_turn>", "Clinical Reasoning:",
-                           "Key Considerations:", "CONFIDENCE:"]:
+                           "<end_of_turn>", "Reasoning:",
+                           "Response:", "CONFIDENCE:"]:
                 if marker not in t:
                     print(f"  Record {i}: missing '{marker}'")
                     issues += 1
