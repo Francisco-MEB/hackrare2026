@@ -1,5 +1,6 @@
 import { theme } from "../../theme";
 import NavItem from "./NavItem";
+import logo from "../../assets/logo.png";
 
 export default function Sidebar({ items, active, onSelect, role, onLogout }) {
   return (
@@ -14,8 +15,9 @@ export default function Sidebar({ items, active, onSelect, role, onLogout }) {
           <div style={{
             width: "clamp(34px, 2.8vw, 44px)", height: "clamp(34px, 2.8vw, 44px)", borderRadius: "10px",
             background: theme.accent, display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden",
           }}>
-            <span style={{ color: "white", fontSize: "clamp(16px, 1.4vw, 22px)" }}>✦</span>
+            <img src={logo} alt="Indicium logo" style={{ width: "235%", height: "235%", objectFit: "contain", filter: "brightness(0) invert(1)", marginTop: "27%" }} />
           </div>
           <span style={{ fontWeight: 600, fontSize: "clamp(18px, 1.5vw, 24px)", letterSpacing: "-0.3px" }}>Indicium</span>
         </div>

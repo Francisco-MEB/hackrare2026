@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { theme } from "../../theme";
 import NodeDiagram from "./NodeDiagram";
+import logo from "../../assets/logo.png";
 
 export default function LoginScreen({ onLogin }) {
   const [hovered, setHovered] = useState(null);
@@ -38,9 +39,9 @@ export default function LoginScreen({ onLogin }) {
           background: theme.accent,
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: `0 4px 24px rgba(232,130,74,0.3)`,
-          flexShrink: 0,
+          flexShrink: 0, overflow: "hidden",
         }}>
-          <span style={{ color: "white", fontSize: "clamp(16px, 2vw, 28px)" }}>✦</span>
+          <img src={logo} alt="Indicium logo" style={{ width: "235%", height: "235%", objectFit: "contain", filter: "brightness(0) invert(1)", marginTop: "27%" }} />
         </div>
         <span style={{
           fontWeight: 600,
