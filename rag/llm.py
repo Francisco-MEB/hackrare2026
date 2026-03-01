@@ -1,24 +1,26 @@
 """
-llm.py — Gemma3:27b language model via Ollama.
+llm.py — LLM instances for the two NeuraCare chatbot models.
 
-Why Ollama + local model?
-  - No API key needed for development/demo
-  - Patient data stays on-device (HIPAA-relevant for production considerations)
-  - Gemma3:27b has strong instruction-following and handles structured output well
+Both models are custom Ollama builds from the Modelfiles:
+  ollama create gemma3-doctor  -f Modelfile.doctor
+  ollama create gemma3-patient -f Modelfile.patient
 
-Key parameter choices:
-  temperature=0.1  → near-deterministic; medical answers should be consistent, not creative
-  num_ctx=8192     → context window; must fit system prompt + top-k chunks + question
-                     (nomic-embed-text chunks are ~800 chars ≈ 200 tokens each;
-                      5 chunks ≈ 1000 tokens + overhead → 8192 is safely large)
-  num_predict=512  → caps response length; keeps doctor notes concise, patient answers short
+Why we do NOT set temperature / top_p / top_k here:
+  Those parameters are already defined in the Modelfiles themselves.
+  Setting them again in LangChain would override the Modelfile values,
+  breaking the carefully tuned behavior (e.g. doctor at 0.3 for clinical
+  precision, patient at 0.6 for warmer conversational tone).
+
+What we DO set:
+  num_ctx=8192  — context window large enough for system prompt + RAG chunks + question.
+                  This is safe to set here since it's infrastructure, not behavior.
+  keep_alive    — keeps the model loaded in VRAM between requests (no cold-start lag).
+  streaming     — toggled per call for streaming vs batch responses.
 
 Pre-requisites (run once):
-  ollama pull gemma3:27b
+  ollama create gemma3-doctor  -f Modelfile.doctor
+  ollama create gemma3-patient -f Modelfile.patient
   ollama pull nomic-embed-text
-
-Note: On first call Ollama will load the model weights into VRAM (~20 GB for 27B).
-Subsequent calls reuse the loaded model instantly.
 """
 
 from functools import lru_cache
@@ -28,29 +30,33 @@ from langchain_core.language_models import BaseChatModel
 from .config import settings
 
 
-@lru_cache(maxsize=1)
-def get_llm(streaming: bool = False) -> BaseChatModel:
+@lru_cache(maxsize=2)   # caches (False,) and (True,) variants
+def get_doctor_llm(streaming: bool = False) -> BaseChatModel:
     """
-    Return a cached Gemma3:27b chat model instance.
-
-    Args:
-        streaming: If True, enables token-by-token streaming so the UI can
-                   display partial responses immediately.  Use streaming=True
-                   in the API route handlers for responsive UX.
+    LLM instance for the doctor portal.
+    Uses gemma3-doctor:latest — clinical, structured, citation-driven.
+    Temperature (0.3) and sampling params are set in Modelfile.doctor.
     """
     return ChatOllama(
-        model=settings.ollama_llm_model,
+        model=settings.doctor_model,
         base_url=settings.ollama_base_url,
-        temperature=0.1,
         num_ctx=8192,
-        num_predict=512,
         streaming=streaming,
-        # Keep model loaded in memory between requests (no cold-start penalty)
         keep_alive="10m",
     )
 
 
-def get_streaming_llm() -> BaseChatModel:
-    """Convenience wrapper — returns the streaming-enabled LLM instance."""
-    # lru_cache keyed on streaming=True separately from streaming=False
-    return get_llm(streaming=True)
+@lru_cache(maxsize=2)
+def get_patient_llm(streaming: bool = False) -> BaseChatModel:
+    """
+    LLM instance for the patient portal.
+    Uses gemma3-patient:latest — warm, plain language, safety-guardrailed.
+    Temperature (0.6) and sampling params are set in Modelfile.patient.
+    """
+    return ChatOllama(
+        model=settings.patient_model,
+        base_url=settings.ollama_base_url,
+        num_ctx=8192,
+        streaming=streaming,
+        keep_alive="10m",
+    )

@@ -28,7 +28,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 
 from .retriever import get_patient_retriever, get_doctor_retriever
-from .llm import get_llm, get_streaming_llm
+from .llm import get_doctor_llm, get_patient_llm
 from .prompts import patient_prompt, doctor_prompt
 
 
@@ -61,7 +61,7 @@ def build_patient_chain(patient_id: str, streaming: bool = False):
         A LangChain Runnable that accepts a question string and returns an answer string.
     """
     retriever = get_patient_retriever(patient_id)
-    llm = get_streaming_llm() if streaming else get_llm()
+    llm = get_patient_llm(streaming=streaming)
 
     chain = (
         RunnableParallel({
@@ -91,7 +91,7 @@ def build_doctor_chain(patient_id: str, streaming: bool = False):
         a structured SOAP-adjacent note string.
     """
     retriever = get_doctor_retriever(patient_id)
-    llm = get_streaming_llm() if streaming else get_llm()
+    llm = get_doctor_llm(streaming=streaming)
 
     chain = (
         RunnableParallel({

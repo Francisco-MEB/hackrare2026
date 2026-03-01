@@ -1,72 +1,61 @@
 """
-prompts.py — System prompt templates for the two chatbot modes.
+prompts.py — RAG context injection templates for the two chatbot models.
 
-TODO: Replace PATIENT_SYSTEM_TEMPLATE and DOCTOR_SYSTEM_TEMPLATE content with
-      final tuned prompts once Gemma3:27b is running locally via Ollama and
-      prompt behavior can be tested against real retrieved chunks.
+Why there are NO system messages here:
+  The full system prompts (behavior rules, guardrails, tone, output format) are
+  already baked into the Ollama models via Modelfile.doctor and Modelfile.patient.
+  Adding a second system message through LangChain would conflict with the
+  Modelfile's SYSTEM block.
 
-Prompt format: LangChain ChatPromptTemplate
-  → SystemMessagePromptTemplate  maps to Gemma3's system role
-  → HumanMessagePromptTemplate   maps to Gemma3's user role
-  ChatOllama handles the role conversion automatically.
+  Instead, we only inject the RAG context and the question through a single
+  HumanMessage.  The model's built-in system prompt handles all behavior;
+  we just feed it the retrieved evidence to reason over.
 
-Two placeholders injected at runtime by the RAG chain:
-  {context}  — top-k chunks retrieved from Supabase pgvector
-  {question} — the user's input message
+Message structure sent to both models:
+  [Modelfile SYSTEM — baked in, always first]
+  HumanMessage:
+    Retrieved context (top-k chunks from Supabase)
+    User question
+
+Placeholders filled at runtime by the RAG chain:
+  {context}  — formatted top-k chunks from Supabase pgvector
+  {question} — the user's input
 """
 
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
+from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 
 
 # ── Patient-facing chatbot ────────────────────────────────────────────────────
-# TODO: refine tone, reading level, escalation triggers, and response length
-#       once Gemma3:27b output style is known.
+# The human turn delivers RAG context followed by the patient's question.
+# gemma3-patient:latest already knows to answer warmly and briefly —
+# we don't need to repeat those instructions here.
 
-_PATIENT_SYSTEM = """\
-You are a caring health companion for someone living with a rare neurological disease.
-Answer using simple, plain language. Keep responses brief and focused.
-Only use the information provided in the context below — do not add outside information.
-If the context does not contain the answer, say: "I don't have that information — please ask your care team."
-Never diagnose, recommend medications, or suggest treatment changes.
-If the question involves an emergency (e.g. sudden severe symptoms), respond only with:
-"Please call 911 or go to your nearest emergency room immediately."
+_PATIENT_HUMAN = """\
+Here is information from your health record and disease knowledge base:
 
-Context:
 {context}
-"""
 
-_PATIENT_HUMAN = "Question: {question}"
+---
+{question}"""
 
 patient_prompt = ChatPromptTemplate.from_messages([
-    SystemMessagePromptTemplate.from_template(_PATIENT_SYSTEM),
     HumanMessagePromptTemplate.from_template(_PATIENT_HUMAN),
 ])
 
 
 # ── Doctor-facing chatbot ─────────────────────────────────────────────────────
-# TODO: refine note structure, citation format, and flag criteria
-#       once Gemma3:27b output style is known.
+# The human turn delivers RAG context followed by the clinical query.
+# gemma3-doctor:latest already knows to output structured clinical notes
+# with citations and confidence labels — no need to repeat those rules here.
 
-_DOCTOR_SYSTEM = """\
-You are a clinical decision-support assistant for a specialist reviewing a patient with a rare neurological disease.
-Use the retrieved context below to surface relevant findings, patterns, and literature.
-Structure your response as:
-  Summary | Key Findings | Patterns | Flags
-Do not recommend specific treatments or dosages. Guide reasoning — do not prescribe.
-Base every statement strictly on the provided context.
-If the context is insufficient, state: "Insufficient data — consider direct assessment."
+_DOCTOR_HUMAN = """\
+Retrieved context (patient record + clinical literature):
 
-Context:
 {context}
-"""
 
-_DOCTOR_HUMAN = "Query: {question}"
+---
+{question}"""
 
 doctor_prompt = ChatPromptTemplate.from_messages([
-    SystemMessagePromptTemplate.from_template(_DOCTOR_SYSTEM),
     HumanMessagePromptTemplate.from_template(_DOCTOR_HUMAN),
 ])

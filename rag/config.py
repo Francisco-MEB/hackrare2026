@@ -26,8 +26,12 @@ class Settings(BaseSettings):
 
     # ── Ollama (local — no API key) ───────────────────────────────────────────
     ollama_base_url: str = "http://localhost:11434"
-    ollama_llm_model: str = "gemma3:27b"
-    ollama_embed_model: str = "nomic-embed-text"   # pulled separately: ollama pull nomic-embed-text
+    # Custom models built from the Modelfiles (run once to create them):
+    #   ollama create gemma3-doctor  -f Modelfile.doctor
+    #   ollama create gemma3-patient -f Modelfile.patient
+    doctor_model: str = "gemma3-doctor:latest"
+    patient_model: str = "gemma3-patient:latest"
+    ollama_embed_model: str = "nomic-embed-text"   # ollama pull nomic-embed-text
 
     # ── Vector store table names in Supabase ─────────────────────────────────
     # These match the SQL schema in supabase/schema.sql
