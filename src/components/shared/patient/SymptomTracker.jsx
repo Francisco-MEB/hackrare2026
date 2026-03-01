@@ -73,6 +73,7 @@ const initValues = () => {
 export default function SymptomTracker() {
   const [activeId, setActiveId] = useState("motor");
   const [values, setValues] = useState(initValues());
+  const [comment, setComment] = useState("");
 
   const active = CATEGORIES.find(c => c.id === activeId);
 
@@ -82,17 +83,34 @@ export default function SymptomTracker() {
     return color;
   };
 
-  return (
-    <div>
-      <h1 className="serif" style={{ fontSize: "clamp(20px, 2.2vw, 32px)", marginBottom: "clamp(4px, 0.5vh, 8px)" }}>
-        Symptom Check-In
-      </h1>
-      <p style={{ color: theme.textMuted, fontSize: "clamp(12px, 1.1vw, 16px)", marginBottom: "clamp(20px, 3vh, 40px)" }}>
-        Mar 1 · Select a category and rate today's symptoms
-      </p>
+  const gridRows = Math.ceil(active.symptoms.length / 2);
 
-      {/* Category selector */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "clamp(12px, 1.4vw, 22px)", marginBottom: "clamp(20px, 3vh, 40px)" }}>
+  return (
+    // Root: locks to viewport height minus <main> top+bottom padding
+    <div style={{
+      height: "calc(100vh - clamp(48px, 7vh, 104px))",
+      display: "flex", flexDirection: "column",
+      gap: "clamp(10px, 1.4vh, 18px)",
+      overflow: "hidden",
+    }}>
+
+      {/* Header */}
+      <div style={{ flexShrink: 0 }}>
+        <h1 className="serif" style={{ fontSize: "clamp(20px, 2.2vw, 30px)", marginBottom: "clamp(2px, 0.3vh, 6px)" }}>
+          Symptom Check-In
+        </h1>
+        <p style={{ color: theme.textMuted, fontSize: "clamp(11px, 1vw, 15px)" }}>
+          Mar 1 · Select a category and rate today's symptoms
+        </p>
+      </div>
+
+      {/* Category selector — fixed height row */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+        gap: "clamp(10px, 1.2vw, 18px)",
+        flexShrink: 0,
+        height: "clamp(160px, 22vh, 270px)",
+      }}>
         {CATEGORIES.map(c => {
           const isActive = c.id === activeId;
           return (
@@ -100,48 +118,41 @@ export default function SymptomTracker() {
               key={c.id}
               onClick={() => setActiveId(c.id)}
               style={{
+                height: "100%",
                 background: isActive ? c.colorMuted : theme.surface,
                 border: `${isActive ? "2px" : "1px"} solid ${isActive ? c.color : theme.border}`,
-                borderRadius: "clamp(14px, 1.5vw, 24px)",
-                padding: "clamp(26px, 3.2vh, 46px) clamp(20px, 2vw, 32px)",
+                borderRadius: "clamp(12px, 1.3vw, 20px)",
+                padding: "clamp(14px, 1.8vh, 24px) clamp(14px, 1.4vw, 22px)",
                 cursor: "pointer", textAlign: "left",
-                display: "flex", flexDirection: "column", gap: "clamp(12px, 1.4vh, 20px)",
+                display: "flex", flexDirection: "column", justifyContent: "space-between",
                 transition: "all 0.3s ease",
-                boxShadow: isActive ? `0 6px 28px ${c.color}28` : "none",
-                minHeight: "clamp(180px, 22vh, 260px)",
+                boxShadow: isActive ? `0 4px 20px ${c.color}28` : "none",
               }}
             >
               <span style={{
-                fontSize: "clamp(34px, 3.4vw, 52px)",
+                fontSize: "clamp(22px, 2.4vw, 38px)",
                 color: isActive ? c.color : theme.textLight,
-                transition: "color 0.3s",
-                lineHeight: 1,
+                transition: "color 0.3s", lineHeight: 1,
               }}>
                 {c.icon}
               </span>
               <div>
                 <p style={{
-                  fontWeight: 700,
-                  fontSize: "clamp(16px, 1.5vw, 24px)",
+                  fontWeight: 700, fontSize: "clamp(13px, 1.3vw, 20px)",
                   color: isActive ? c.color : theme.text,
-                  marginBottom: "clamp(4px, 0.5vh, 8px)",
+                  marginBottom: "clamp(2px, 0.3vh, 5px)",
                   transition: "color 0.3s",
                 }}>
                   {c.label}
                 </p>
-                <p style={{
-                  fontSize: "clamp(12px, 1.1vw, 16px)",
-                  color: theme.textMuted,
-                  lineHeight: 1.4,
-                }}>
+                <p style={{ fontSize: "clamp(10px, 0.9vw, 14px)", color: theme.textMuted, lineHeight: 1.3 }}>
                   {c.desc}
                 </p>
               </div>
               <div style={{
-                fontSize: "clamp(12px, 1.1vw, 16px)",
+                fontSize: "clamp(10px, 0.9vw, 13px)",
                 color: isActive ? c.color : theme.textLight,
-                fontWeight: 500,
-                transition: "color 0.3s",
+                fontWeight: 500, transition: "color 0.3s",
               }}>
                 {c.symptoms.length} symptoms
               </div>
@@ -150,28 +161,42 @@ export default function SymptomTracker() {
         })}
       </div>
 
-      {/* Symptom sliders for active category */}
+      {/* Symptom panel — stretches to fill remaining height */}
       <div style={{
+        flex: 1, minHeight: 0,
         background: theme.surface, borderRadius: "clamp(12px, 1.3vw, 20px)",
         border: `1px solid ${theme.border}`,
-        padding: "clamp(18px, 2.2vh, 32px) clamp(18px, 1.8vw, 30px)",
-        marginBottom: "clamp(14px, 1.8vh, 24px)",
+        padding: "clamp(14px, 1.8vh, 24px) clamp(16px, 1.6vw, 26px)",
+        display: "flex", flexDirection: "column",
+        overflow: "hidden",
       }}>
         {/* Panel header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "clamp(8px, 0.8vw, 12px)", marginBottom: "clamp(16px, 2.2vh, 30px)" }}>
-          <span style={{ fontSize: "clamp(18px, 1.6vw, 24px)", color: active.color }}>{active.icon}</span>
-          <div>
-            <p style={{ fontWeight: 700, fontSize: "clamp(13px, 1.2vw, 18px)", color: active.color }}>
-              {active.label} Symptoms
-            </p>
-            <p style={{ fontSize: "clamp(10px, 0.9vw, 13px)", color: theme.textMuted }}>
-              Rate severity from 1 (none) to 10 (severe)
-            </p>
+        <div style={{
+          flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginBottom: "clamp(10px, 1.4vh, 18px)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "clamp(8px, 0.8vw, 12px)" }}>
+            <span style={{ fontSize: "clamp(16px, 1.5vw, 22px)", color: active.color }}>{active.icon}</span>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: "clamp(13px, 1.2vw, 17px)", color: active.color }}>
+                {active.label} Symptoms
+              </p>
+              <p style={{ fontSize: "clamp(10px, 0.85vw, 13px)", color: theme.textMuted }}>
+                Rate severity from 1 (none) to 10 (severe)
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Sliders grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(14px, 1.6vw, 24px)" }}>
+        {/* Sliders grid — fills all remaining panel space */}
+        <div style={{
+          flex: 1, minHeight: 0,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gridTemplateRows: `repeat(${gridRows}, 1fr)`,
+          gap: "clamp(10px, 1.2vw, 16px)",
+        }}>
           {active.symptoms.map((s, i) => {
             const val = values[s.key];
             const col = scoreColor(val, active.color);
@@ -180,18 +205,19 @@ export default function SymptomTracker() {
               <div
                 key={s.key}
                 style={{
-                  background: theme.bg, borderRadius: "clamp(12px, 1.2vw, 20px)",
-                  padding: "clamp(22px, 2.8vh, 38px) clamp(22px, 2.2vw, 34px)",
+                  background: theme.bg, borderRadius: "clamp(10px, 1vw, 16px)",
+                  padding: "clamp(12px, 1.5vh, 20px) clamp(14px, 1.4vw, 22px)",
                   border: `1px solid ${theme.border}`,
                   gridColumn: isOddLast ? "1 / -1" : undefined,
-                  minHeight: "clamp(150px, 18vh, 220px)",
                   display: "flex", flexDirection: "column", justifyContent: "space-between",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "clamp(14px, 1.8vh, 24px)" }}>
-                  <p style={{ fontWeight: 600, fontSize: "clamp(14px, 1.3vw, 20px)", color: theme.text }}>{s.label}</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <p style={{ fontWeight: 600, fontSize: "clamp(12px, 1.1vw, 17px)", color: theme.text }}>
+                    {s.label}
+                  </p>
                   <span style={{
-                    fontSize: "clamp(24px, 2.4vw, 36px)", fontWeight: 700, color: col,
+                    fontSize: "clamp(20px, 2vw, 30px)", fontWeight: 700, color: col,
                     minWidth: "2ch", textAlign: "right",
                   }}>
                     {val}
@@ -200,46 +226,52 @@ export default function SymptomTracker() {
                 <input
                   type="range" min="1" max="10" value={val}
                   onChange={e => setValues(prev => ({ ...prev, [s.key]: +e.target.value }))}
-                  style={{ width: "100%", accentColor: active.color, cursor: "pointer", height: "6px" }}
+                  style={{ width: "100%", accentColor: active.color, cursor: "pointer" }}
                 />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "clamp(6px, 0.8vh, 12px)" }}>
-                  <span style={{ fontSize: "clamp(11px, 1vw, 15px)", color: theme.textLight }}>None</span>
-                  <span style={{ fontSize: "clamp(11px, 1vw, 15px)", color: theme.textLight }}>Severe</span>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "clamp(10px, 0.85vw, 13px)", color: theme.textLight }}>None</span>
+                  <span style={{ fontSize: "clamp(10px, 0.85vw, 13px)", color: theme.textLight }}>Severe</span>
                 </div>
               </div>
             );
           })}
         </div>
-      </div>
 
-      {/* Log button */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "clamp(14px, 1.8vh, 24px)" }}>
-        <button style={{
-          padding: "clamp(12px, 1.4vh, 18px) clamp(24px, 2.4vw, 36px)",
-          borderRadius: "clamp(10px, 1vw, 14px)",
-          background: active.color, color: "white", border: "none",
-          fontWeight: 600, fontSize: "clamp(13px, 1.1vw, 16px)",
-          cursor: "pointer", fontFamily: "inherit",
-          boxShadow: `0 4px 16px ${active.color}44`,
-          transition: "background 0.3s",
+        {/* Bottom bar: comments + log button */}
+        <div style={{
+          flexShrink: 0,
+          display: "flex", alignItems: "center", gap: "clamp(10px, 1vw, 16px)",
+          marginTop: "clamp(10px, 1.2vh, 16px)",
         }}>
-          Log {active.label} Symptoms
-        </button>
-      </div>
-
-      {/* Flare prediction */}
-      <div style={{
-        background: "#FFF9F6", borderRadius: "clamp(12px, 1.3vw, 20px)",
-        padding: "clamp(14px, 1.6vh, 22px) clamp(16px, 1.6vw, 26px)",
-        border: `1.5px solid ${theme.accentLight}`,
-      }}>
-        <p style={{ fontWeight: 600, fontSize: "clamp(11px, 1vw, 15px)", color: theme.accent, marginBottom: "clamp(6px, 0.8vh, 10px)" }}>
-          ⚡ Flare Prediction
-        </p>
-        <p style={{ fontSize: "clamp(11px, 1vw, 15px)", color: theme.text, lineHeight: "1.6" }}>
-          Based on your last 7 days of data, there's a <strong>moderate likelihood of increased severity</strong> this weekend.
-          Motor and sensory scores have trended upward since Wednesday. Consider resting proactively and hydrating well.
-        </p>
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder={`Any additional notes for today's ${active.label.toLowerCase()} symptoms…`}
+            rows={2}
+            style={{
+              flex: 1,
+              padding: "clamp(8px, 1vh, 12px) clamp(12px, 1.2vw, 18px)",
+              borderRadius: "clamp(8px, 0.8vw, 12px)",
+              border: `1.5px solid ${theme.border}`,
+              fontSize: "clamp(11px, 1vw, 14px)",
+              fontFamily: "inherit", color: theme.text,
+              background: theme.bg, resize: "none", outline: "none",
+              lineHeight: 1.5,
+            }}
+          />
+          <button style={{
+            padding: "clamp(10px, 1.2vh, 16px) clamp(16px, 1.6vw, 24px)",
+            borderRadius: "clamp(8px, 0.8vw, 12px)",
+            background: active.color, color: "white", border: "none",
+            fontWeight: 600, fontSize: "clamp(12px, 1vw, 15px)",
+            cursor: "pointer", fontFamily: "inherit",
+            boxShadow: `0 3px 12px ${active.color}44`,
+            transition: "background 0.3s", flexShrink: 0,
+            alignSelf: "stretch",
+          }}>
+            Log {active.label}
+          </button>
+        </div>
       </div>
     </div>
   );

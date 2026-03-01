@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { theme } from "../../../theme";
 
+const days = ["M", "T", "W", "T", "F", "S", "S"];
+const heatData = [2,3,6,8,7,4,2, 1,2,5,9,8,5,3, 2,1,3,5,4,2,1, 3,4,6,7,6,3,2];
+const getHeat = (v) => {
+  if (v >= 8) return theme.danger;
+  if (v >= 6) return theme.warning;
+  if (v >= 4) return theme.accentLight;
+  if (v >= 2) return "#FDE8D8";
+  return theme.border;
+};
+
 export default function DoctorPatientView({ patient, onBack }) {
   const [summaryType, setSummaryType] = useState(null);
   const [generated, setGenerated] = useState(false);
@@ -89,7 +99,7 @@ export default function DoctorPatientView({ patient, onBack }) {
       )}
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px", marginBottom: "24px" }}>
         {[
           { label: "Avg Pain (7d)",          val: "6.4", sub: "↑ from 5.1"    },
           { label: "Flare Days (30d)",        val: "8",   sub: "of 28 reported" },
@@ -103,6 +113,38 @@ export default function DoctorPatientView({ patient, onBack }) {
             <p style={{ fontSize: "12px", color: theme.textMuted, marginTop: "4px" }}>{s.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Symptom Intensity Heatmap */}
+      <div style={{ background: theme.surface, borderRadius: "14px", padding: "20px", border: `1px solid ${theme.border}` }}>
+        <p style={{ fontWeight: 600, fontSize: "14px", marginBottom: "4px" }}>
+          Symptom Intensity — February
+        </p>
+        <p style={{ fontSize: "12px", color: theme.textMuted, marginBottom: "16px" }}>
+          Daily severity heatmap
+        </p>
+        <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
+          {days.map((d, i) => (
+            <div key={i} style={{ flex: 1, textAlign: "center", fontSize: "11px", color: theme.textLight, fontWeight: 600 }}>
+              {d}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px" }}>
+          {heatData.map((v, i) => (
+            <div key={i} style={{
+              height: "28px", borderRadius: "5px",
+              background: getHeat(v), opacity: v === 0 ? 0.3 : 1,
+            }} title={`Score: ${v}`} />
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: "12px", marginTop: "12px", alignItems: "center" }}>
+          <span style={{ fontSize: "11px", color: theme.textLight }}>Low</span>
+          {[theme.border, "#FDE8D8", theme.accentLight, theme.warning, theme.danger].map((c, i) => (
+            <div key={i} style={{ width: "14px", height: "14px", borderRadius: "3px", background: c }} />
+          ))}
+          <span style={{ fontSize: "11px", color: theme.textLight }}>High</span>
+        </div>
       </div>
     </div>
   );
