@@ -44,6 +44,14 @@ export const globalCss = `
     from { transform: scaleX(0); }
     to   { transform: scaleX(1); }
   }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
   .anim-logo    { opacity: 0; animation: fadeUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.05s forwards; }
   .anim-tagline { opacity: 0; animation: fadeUp 0.7s cubic-bezier(0.22,1,0.36,1) 0.35s forwards; }
   .anim-divider { transform-origin: left; transform: scaleX(0); animation: expandLine 0.5s cubic-bezier(0.22,1,0.36,1) 0.7s forwards; }

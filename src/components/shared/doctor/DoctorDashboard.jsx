@@ -1,12 +1,38 @@
+import { useState, useEffect } from "react";
 import { theme } from "../../../theme";
+import { getPatients } from "../../../api";
 
 export default function DoctorDashboard({ onSelectPatient }) {
-  const patients = [
-    { name: "Alex Chen",       id: "P001", condition: "Empty Nose Syndrome",      lastVisit: "Jan 15", severity: "Moderate-High", alert: true  },
-    { name: "Maria Fernandez", id: "P002", condition: "CRPS Type II",             lastVisit: "Feb 12", severity: "Moderate",      alert: false },
-    { name: "James Liu",       id: "P003", condition: "Undiagnosed — Autonomic",  lastVisit: "Feb 20", severity: "High",          alert: true  },
-    { name: "Priya Nair",      id: "P004", condition: "Ehlers-Danlos Syndrome",   lastVisit: "Jan 28", severity: "Low",           alert: false },
-  ];
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    getPatients()
+      .then(setPatients)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "40vh" }}>
+        <p style={{ color: theme.textMuted }}>Loading patients...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="serif" style={{ fontSize: "26px", marginBottom: "6px" }}>Patient Panel</h1>
+        <p style={{ color: theme.danger, fontSize: "14px" }}>Failed to load patients: {error}</p>
+        <p style={{ color: theme.textMuted, fontSize: "13px", marginTop: "8px" }}>
+          Ensure the API is running: <code>uvicorn api:app --reload</code>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -15,6 +41,9 @@ export default function DoctorDashboard({ onSelectPatient }) {
         Select a patient to view their profile and generate a summary
       </p>
 
+      {patients.length === 0 ? (
+        <p style={{ color: theme.textMuted }}>No patients found.</p>
+      ) : (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
         {patients.map(p => (
           <div
@@ -34,7 +63,7 @@ export default function DoctorDashboard({ onSelectPatient }) {
                 }}>◎</div>
                 <div>
                   <p style={{ fontWeight: 600, fontSize: "15px" }}>{p.name}</p>
-                  <p style={{ fontSize: "12px", color: theme.textLight }}>{p.id}</p>
+                  <p style={{ fontSize: "12px", color: theme.textLight }}>{p.id?.slice(0, 8) || p.id}</p>
                 </div>
               </div>
               {p.alert && (
@@ -56,6 +85,7 @@ export default function DoctorDashboard({ onSelectPatient }) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

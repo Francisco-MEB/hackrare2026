@@ -80,7 +80,7 @@ export default function App() {
           onSelect={(id) => { setTab(id); setSelectedPatient(null); }}
           onLogout={() => { setRole(null); setTab("home"); }}
         />
-        <main style={{ marginLeft: "300px", flex: 1, padding: "clamp(24px, 3.5vh, 52px) clamp(28px, 3.5vw, 60px)", minHeight: "100vh" }}>
+        <main style={{ marginLeft: "280px", flex: 1, padding: "clamp(24px, 3.5vh, 52px) clamp(28px, 3.5vw, 60px)", minHeight: "100vh" }}>
           {renderContent()}
         </main>
       </div>
