@@ -1,0 +1,33 @@
+Clinical decision support only — not a recommendation. Verify all information against current guidelines and the patient's full clinical context.
+
+Here's a contingency plan for potential flare-ups, incorporating actionable insights based on the provided context:
+
+**Flare Week Contingency Plan**
+
+**I. Identification & Monitoring**
+
+*   **Flagged Changes Since Last Visit:**
+    *   DOMAIN | DIRECTION | DETAIL | DATA PERIOD
+        *   Muscle Spasm | WORSENING | Severity increased from 4 to 6, reported as more frequent, associated with stressful days. | 2026-02-20 to 2026-02-27
+*   **Rationale:** Recent symptom log entries indicate a concerning trend of increasing muscle spasm severity and frequency, potentially signaling a flare. [Patient-context, 2026-02-28]
+
+**II. Actionable Insights & Pathway Options**
+
+*   **Adherence Review:** Given the importance of consistent medication for symptom control, immediately assess medication adherence. [Source: [1], 2026-03-01, MODERATE CONFIDENCE]
+    *   *Action:* Directly inquire about missed doses and potential barriers to adherence.
+*   **Trigger Identification:** Explore potential triggers for the flare, such as stress, specific activities, or environmental factors. [Source: [1], 2026-03-01, MODERATE CONFIDENCE]
+    *   *Action:* Review patient’s daily routine and stressors.
+*   **Symptom Management Options:**
+    *   **VMAT2 Inhibitors:** Continue current VMAT2 inhibitor therapy (tetrabenazine, deutetrabenazine, or valbenazine). [Source: [1], 2026-03-01, MODERATE CONFIDENCE]
+        *   *Consideration:* Dosage adjustments may be necessary during a flare. Dosage ranges should be verified against current formulary. [Source: [1], 2026-03-01, MODERATE CONFIDENCE]
+    *   **Adjunctive Therapies:** Reinforce the importance of physical therapy, speech therapy, and psychological support. [Source: [1], 2026-03-01, MODERATE CONFIDENCE]
+        *   *Action:* Ensure patient has access to and is actively engaged in these therapies.
+
+**III. Escalation Criteria**
+
+*   If muscle spasm severity reaches a pre-defined threshold (e.g., consistently ≥7 on a subjective scale), consider escalation to neurology for further evaluation. [Source: Physician-configured threshold – verify independently]
+
+Clinical decision support only — not a recommendation. Verify all information against current guidelines and the patient's full clinical context.
+
+============================================================
+Demo complete.
