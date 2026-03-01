@@ -116,6 +116,7 @@ def get_patient_dashboard(patient_id: str):
     """Dashboard metrics and chart data (no LLM)."""
     try:
         data = get_dashboard_data(patient_id)
+        raw = data.get("raw", {})
         return {
             "patient": data["patient"],
             "insights": data["insights"],
@@ -124,6 +125,13 @@ def get_patient_dashboard(patient_id: str):
             "symptom_names": data.get("symptom_names", []),
             "flare_days_by_week": data["flare_days_by_week"],
             "symptom_frequency_by_week": data["symptom_frequency_by_week"],
+            "history": {
+                "symptom_logs": raw.get("symptom_logs", []),
+                "adherence": raw.get("adherence", []),
+                "appointments": raw.get("appointments", []),
+                "calendar": raw.get("calendar", []),
+                "medications": raw.get("medications", []),
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

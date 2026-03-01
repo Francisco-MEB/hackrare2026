@@ -13,8 +13,6 @@ import DeviceData from "./components/shared/patient/DeviceData";
 // Doctor
 import DoctorDashboard from "./components/shared/doctor/DoctorDashboard";
 import DoctorPatientView from "./components/shared/doctor/DoctorPatientView";
-import DoctorAI from "./components/shared/doctor/DoctorAI";
-
 const patientNav = [
   { id: "home",     icon: "⊞", label: "Dashboard"      },
   { id: "symptoms", icon: "◈", label: "Symptoms"        },
@@ -23,8 +21,7 @@ const patientNav = [
 ];
 
 const doctorNav = [
-  { id: "patients", icon: "⊜", label: "Patients"    },
-  { id: "docai",    icon: "✦", label: "Clinical AI"  },
+  { id: "patients", icon: "⊜", label: "Patients" },
 ];
 
 export default function App() {
@@ -65,7 +62,6 @@ export default function App() {
         if (selectedPatient) return <DoctorPatientView patient={selectedPatient} onBack={() => setSelectedPatient(null)} />;
         return <DoctorDashboard onSelectPatient={(p) => setSelectedPatient(p)} />;
       }
-      if (tab === "docai") return <DoctorAI />;
     }
   };
 

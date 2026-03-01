@@ -67,7 +67,7 @@ export default function LoginScreen({ onLogin }) {
           fontWeight: 500,
           lineHeight: 1,
         }}>
-          The intelligence layer for symptom management
+          The <span style={{ color: theme.accent }}>intelligence layer</span> for symptom management
         </p>
       </div>
 

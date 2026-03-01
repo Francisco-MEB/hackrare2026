@@ -35,6 +35,12 @@ export default function DoctorPatientView({ patient, onBack }) {
   const [typingIndex, setTypingIndex] = useState({}); // { messageIndex: displayedLength }
   const [selectedChart, setSelectedChart] = useState(null);
   const [chartDropupOpen, setChartDropupOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyMonth, setHistoryMonth] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [selectedDay, setSelectedDay] = useState(null);
   const dropupRef = useRef(null);
 
   const patientId = patient.id;
@@ -255,7 +261,18 @@ export default function DoctorPatientView({ patient, onBack }) {
             <h1 className="serif" style={{ fontSize: "22px", margin: 0 }}>{dashboard?.patient?.name ?? patient.name}</h1>
             <p style={{ color: theme.textMuted, fontSize: "13px", margin: "2px 0 0 0" }}>{dashboard?.patient?.condition ?? patient.condition}</p>
           </div>
-          <div />
+          <div style={{ justifySelf: "end", display: "flex", alignItems: "center" }}>
+            <button
+              onClick={() => setHistoryOpen(true)}
+              style={{
+                background: theme.accent, color: "white", border: "none", cursor: "pointer",
+                padding: "8px 16px", borderRadius: "9999px", fontWeight: 600, fontSize: "13px",
+                fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px",
+              }}
+            >
+              <ion-icon name="book-outline" style={{ fontSize: "16px" }} /> Detailed History
+            </button>
+          </div>
         </div>
 
         {/* AI-generated summary — scrollable, no cutoff */}
@@ -265,7 +282,7 @@ export default function DoctorPatientView({ patient, onBack }) {
           maxHeight: "220px", overflowY: "auto",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-            <span style={{ fontSize: "14px" }}>✦</span>
+            <span style={{ fontSize: "14px", color: theme.accent }}>✦</span>
             <p style={{ fontWeight: 700, fontSize: "13px", color: theme.accent, margin: 0 }}>AI Summary</p>
             <span style={{ fontSize: "11px", color: theme.textLight, marginLeft: "auto" }}>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
           </div>
@@ -303,6 +320,227 @@ export default function DoctorPatientView({ patient, onBack }) {
         </div>
       </div>
 
+      {/* History modal — visual calendar */}
+      {historyOpen && (() => {
+        const h = dashboard?.history || {};
+        const symptomLogs = h.symptom_logs || [];
+        const adherence = h.adherence || [];
+        const appointments = h.appointments || [];
+        const calendar = h.calendar || [];
+        const getHeat = (v) => {
+          if (!v || v === 0) return "transparent";
+          if (v >= 7) return theme.danger;
+          if (v >= 5) return theme.warning;
+          if (v >= 3) return theme.accentLight;
+          return "#FDE8D8";
+        };
+        const toDateKey = (s) => (s ? String(s).split("T")[0].split(" ")[0].slice(0, 10) : "");
+        const byDate = {};
+        symptomLogs.forEach((sl) => {
+          const k = toDateKey(sl.logged_at);
+          if (!byDate[k]) byDate[k] = { symptoms: [], adherence: [], appointments: [], calendar: [] };
+          byDate[k].symptoms.push(sl);
+        });
+        adherence.forEach((a) => {
+          const k = toDateKey(a.logged_date);
+          if (!byDate[k]) byDate[k] = { symptoms: [], adherence: [], appointments: [], calendar: [] };
+          byDate[k].adherence.push(a);
+        });
+        appointments.forEach((a) => {
+          const k = toDateKey(a.scheduled_at);
+          if (!byDate[k]) byDate[k] = { symptoms: [], adherence: [], appointments: [], calendar: [] };
+          byDate[k].appointments.push(a);
+        });
+        calendar.forEach((ev) => {
+          const k = toDateKey(ev.event_at);
+          if (!byDate[k]) byDate[k] = { symptoms: [], adherence: [], appointments: [], calendar: [] };
+          byDate[k].calendar.push(ev);
+        });
+        const { year, month } = historyMonth;
+        const first = new Date(year, month, 1);
+        const last = new Date(year, month + 1, 0);
+        const daysInMonth = last.getDate();
+        const startOffset = first.getDay();
+        const days = [];
+        for (let i = 0; i < startOffset; i++) days.push(null);
+        for (let d = 1; d <= daysInMonth; d++) days.push(d);
+        const monthName = first.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        const prevMonth = () => setHistoryMonth((m) => (m.month === 0 ? { year: m.year - 1, month: 11 } : { ...m, month: m.month - 1 }));
+        const nextMonth = () => setHistoryMonth((m) => (m.month === 11 ? { year: m.year + 1, month: 0 } : { ...m, month: m.month + 1 }));
+        const fmtTime = (s) => s ? new Date(s.replace("Z", "")).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+        const dayData = (d) => {
+          const k = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          return byDate[k] || { symptoms: [], adherence: [], appointments: [], calendar: [] };
+        };
+        const maxSev = (arr) => Math.max(0, ...arr.map((s) => parseInt(s.severity, 10) || 0));
+        const selectedData = selectedDay ? dayData(selectedDay) : null;
+        return (
+          <div
+            onClick={() => { setHistoryOpen(false); setSelectedDay(null); }}
+            style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: "16px",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: theme.surface, borderRadius: "16px", border: `1px solid ${theme.border}`,
+                width: "min(98vw, 1000px)", height: "min(96vh, 860px)", minWidth: 420, minHeight: 560,
+                overflow: "hidden", display: "flex", flexDirection: "column",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.15)", flexShrink: 0,
+              }}
+            >
+              <div style={{ flexShrink: 0, padding: "14px 20px", borderBottom: `1px solid ${theme.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <p style={{ fontWeight: 700, fontSize: "18px", color: theme.accent, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <ion-icon name="book-outline" style={{ fontSize: "22px" }} /> History
+                </p>
+                <button onClick={() => { setHistoryOpen(false); setSelectedDay(null); }} style={{ background: "none", border: "none", cursor: "pointer", color: theme.textMuted, lineHeight: 1, padding: "4px", display: "flex", alignItems: "center" }}>
+                  <ion-icon name="close" style={{ fontSize: "24px" }} />
+                </button>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", flexDirection: "column", padding: "16px 20px", overflow: "hidden" }}>
+                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "100px" }}>
+                  <button onClick={prevMonth} style={{ background: "none", border: "none", cursor: "pointer", color: theme.textMuted, padding: "4px", display: "flex", alignItems: "center" }}>
+                    <ion-icon name="chevron-back-outline" style={{ fontSize: "22px" }} />
+                  </button>
+                  <p style={{ fontWeight: 600, fontSize: "17px", margin: 0 }}>{monthName}</p>
+                  <button onClick={nextMonth} style={{ background: "none", border: "none", cursor: "pointer", color: theme.textMuted, padding: "4px", display: "flex", alignItems: "center" }}>
+                    <ion-icon name="chevron-forward-outline" style={{ fontSize: "22px" }} />
+                  </button>
+                </div>
+                <div style={{ flexShrink: 0, display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: "4px", marginBottom: "6px" }}>
+                  {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                    <div key={i} style={{ textAlign: "center", fontSize: "12px", fontWeight: 600, color: theme.textLight }}>{d}</div>
+                  ))}
+                </div>
+                <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gridTemplateRows: "repeat(6, minmax(0, 1fr))", gap: "4px" }}>
+                  {days.map((d, i) => {
+                    if (d === null) return <div key={i} />;
+                    const data = dayData(d);
+                    const sev = maxSev(data.symptoms);
+                    const hasApt = data.appointments.length > 0 || data.calendar.length > 0;
+                    const hasMeds = data.adherence.length > 0;
+                    const missed = data.adherence.filter((a) => !a.taken).length;
+                    const isSelected = selectedDay === d;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedDay(selectedDay === d ? null : d)}
+                        style={{
+                          width: "100%", height: "100%", minHeight: 0, minWidth: 0, border: "none", borderRadius: "8px",
+                          background: getHeat(sev), cursor: "pointer", padding: "2px",
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                          fontFamily: "inherit", fontSize: "13px", fontWeight: 600, color: sev >= 5 ? "white" : theme.text,
+                          boxShadow: isSelected ? `0 0 0 2px ${theme.accent}` : "none",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <span>{d}</span>
+                        <span style={{ fontSize: "10px", display: "flex", gap: "1px", marginTop: "1px", flexShrink: 0 }}>
+                          {hasMeds && (missed > 0
+                            ? <ion-icon name="close-circle" style={{ color: theme.danger }} title="Missed med" />
+                            : <ion-icon name="checkmark-circle" style={{ color: theme.success }} title="Taken" />)}
+                          {hasApt && <ion-icon name="calendar-outline" style={{ color: theme.accent }} title="Appointment" />}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px", minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 600, color: theme.textMuted }}>Severity</span>
+                    {[
+                      { c: "transparent", label: "None" },
+                      { c: "#FDE8D8", label: "1–2" },
+                      { c: theme.accentLight, label: "3–4" },
+                      { c: theme.warning, label: "5–6" },
+                      { c: theme.danger, label: "7+" },
+                    ].map(({ c, label }, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                        <div style={{ width: "12px", height: "12px", borderRadius: "2px", background: c, border: c === "transparent" ? `1px solid ${theme.border}` : "none", flexShrink: 0 }} title={label} />
+                        <span style={{ fontSize: "14px", color: theme.textLight }}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "14px", color: theme.textMuted }}>
+                      <ion-icon name="checkmark-circle" style={{ color: theme.success, fontSize: "14px" }} /> medication taken
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "14px", color: theme.textMuted }}>
+                      <ion-icon name="close-circle" style={{ color: theme.danger, fontSize: "14px" }} /> medication missed
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "14px", color: theme.textMuted }}>
+                      <ion-icon name="calendar-outline" style={{ color: theme.accent, fontSize: "14px" }} /> appointment
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Day details — fixed strip at bottom */}
+              <div style={{
+                flexShrink: 0, minWidth: 0, background: theme.surfaceWarm, borderTop: `1px solid ${theme.border}`,
+                padding: "10px 20px", minHeight: "48px", overflow: "hidden",
+                display: "flex", flexDirection: "column", gap: "6px",
+              }}>
+                {selectedData && selectedDay ? (
+                  <>
+                    <p style={{ fontSize: "14px", fontWeight: 600, color: theme.textMuted, margin: 0 }}>
+                      {new Date(year, month, selectedDay).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                    {(selectedData.symptoms.length > 0 || selectedData.adherence.length > 0 || selectedData.appointments.length > 0 || selectedData.calendar.length > 0) ? (
+                      <div style={{ display: "flex", flexDirection: "row", gap: "24px", minWidth: 0, flexWrap: "nowrap" }}>
+                        {selectedData.symptoms.length > 0 && (
+                          <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                            {selectedData.symptoms.map((sl, i) => {
+                              const sym = sl.symptoms;
+                              const name = (Array.isArray(sym) && sym[0]?.name) || sym?.name || "Symptom";
+                              return (
+                                <div key={i} style={{ fontSize: "14px", marginBottom: "2px", display: "flex", alignItems: "flex-start", gap: "6px", minWidth: 0 }}>
+                                  <span style={{ overflowWrap: "break-word", wordBreak: "break-word" }}><span style={{ color: theme.accent, fontWeight: 600 }}>{name}</span> {sl.severity}/10{sl.notes ? ` — ${sl.notes}` : ""}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {selectedData.adherence.length > 0 && (
+                          <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                            {selectedData.adherence.map((a, i) => (
+                              <div key={i} style={{ fontSize: "14px", marginBottom: "2px", display: "flex", alignItems: "flex-start", gap: "6px", minWidth: 0 }}>{a.taken
+                                  ? <ion-icon name="checkmark-circle" style={{ color: theme.success, fontSize: "14px", flexShrink: 0 }} />
+                                  : <ion-icon name="close-circle" style={{ color: theme.danger, fontSize: "14px", flexShrink: 0 }} />}
+                                <span style={{ overflowWrap: "break-word", wordBreak: "break-word" }}>{a.medications?.name || "Med"}{a.notes ? ` — ${a.notes}` : ""}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(selectedData.appointments.length > 0 || selectedData.calendar.length > 0) && (
+                          <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                            {selectedData.appointments.map((a, i) => (
+                              <div key={`apt-${i}`} style={{ fontSize: "14px", marginBottom: "2px", display: "flex", alignItems: "flex-start", gap: "6px", minWidth: 0 }}><ion-icon name="calendar-outline" style={{ color: theme.accent, fontSize: "12px", flexShrink: 0 }} />
+                                <span style={{ overflowWrap: "break-word", wordBreak: "break-word" }}>{fmtTime(a.scheduled_at)} — {a.physician || ""} {a.visit_type || ""}</span>
+                              </div>
+                            ))}
+                            {selectedData.calendar.map((ev, i) => (
+                              <div key={`cal-${i}`} style={{ fontSize: "14px", marginBottom: "2px", display: "flex", alignItems: "flex-start", gap: "6px", minWidth: 0 }}><ion-icon name="calendar-outline" style={{ color: theme.accent, fontSize: "12px", flexShrink: 0 }} />
+                                <span style={{ overflowWrap: "break-word", wordBreak: "break-word" }}>{ev.title || ""} {ev.event_type ? `(${ev.event_type})` : ""}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: "14px", color: theme.textMuted, margin: 0 }}>No entries for this day</p>
+                    )}
+                  </>
+                ) : (
+                  <p style={{ fontSize: "14px", color: theme.textMuted, margin: 0 }}>Click a day to view details</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Right: Patient chatbot with chart dropup */}
       <div style={{
         flex: "0 0 380px",
@@ -316,8 +554,8 @@ export default function DoctorPatientView({ patient, onBack }) {
         alignSelf: "stretch",
       }}>
         <div style={{ padding: "14px 16px", borderBottom: `1px solid ${theme.border}` }}>
-          <p style={{ fontWeight: 700, fontSize: "13px", color: theme.accent }}>✦ Patient Chatbot</p>
-          <p style={{ fontSize: "11px", color: theme.textMuted, marginTop: "2px" }}>Specialized for {patient.name}</p>
+          <p style={{ fontWeight: 700, fontSize: "15px", color: theme.accent }}>✦ Patient Chatbot</p>
+          <p style={{ fontSize: "13px", color: theme.textMuted, marginTop: "2px" }}>Specialized for {patient.name}</p>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
