@@ -5,7 +5,7 @@ import { getPatientDashboard, postMedicationAdherence } from "../../../api";
 const toDisplayTime = (freq) => {
   if (!freq) return "—";
   const f = (freq || "").toLowerCase();
-  if (f.includes("morning") || f.includes("am") || f.includes("once")) return "Morning";
+  if (f.includes("morning") || f.includes("am") || f.includes("once")) return "AM";
   if (f.includes("evening") || f.includes("pm") || f.includes("night")) return "Evening";
   if (f.includes("twice")) return "AM / PM";
   return freq;
@@ -116,7 +116,7 @@ export default function PatientDashboard({ patient, onNavigate }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 1.2vw, 18px)" }}>
-          <span style={{ fontSize: "clamp(22px, 2.2vw, 32px)", filter: "grayscale(1)" }}>📋</span>
+          <ion-icon name="pencil-outline" style={{ fontSize: "clamp(22px, 2.2vw, 32px)", color: "rgba(255,255,255,0.9)" }} />
           <div>
             <p style={{ fontWeight: 700, fontSize: "clamp(14px, 1.4vw, 20px)", color: "white", marginBottom: "2px" }}>
               Haven't logged your symptoms today?
@@ -229,7 +229,7 @@ export default function PatientDashboard({ patient, onNavigate }) {
                 background: theme.accentMuted, borderRadius: "12px",
                 padding: "clamp(8px, 1vh, 14px) clamp(14px, 1.4vw, 22px)",
                 fontSize: "clamp(14px, 1.3vw, 20px)", fontWeight: 700, color: theme.accent,
-                minWidth: "clamp(62px, 6vw, 86px)", textAlign: "center", flexShrink: 0,
+                width: "clamp(62px, 6vw, 86px)", minWidth: "clamp(62px, 6vw, 86px)", textAlign: "center", flexShrink: 0,
               }}>
                 {u.date}
               </div>
