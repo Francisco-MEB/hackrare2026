@@ -3,19 +3,21 @@
 Convert rare_disease_dataset.json → Gemma 3 SFT training JSONL.
 
 Pipeline:
-  1. Field mapping  (question → instruction, answer → output)
-  2. Reasoning injection (Option B — prepend CoT before final answer)
-  3. NeuraCare style injection
-     - Strip prescriptive language
-     - Add CONFIDENCE label (from difficulty)
-     - Add clinical disclaimer
-     - Reformat source citations
-  4. Gemma 3 chat template wrapping
-  5. Write JSONL with a single `text` field
+  1. Drop records with no reasoning — they have nothing to teach
+  2. Field mapping (question → user turn)
+  3. Build model output:
+       Clinical Reasoning: {CoT — the star of the show}
+       Key Considerations: {distilled, non-prescriptive summary from answer}
+       CONFIDENCE: HIGH | MODERATE
+       {disclaimer}
+  4. NeuraCare style injection on both reasoning and key considerations:
+       - Strip prescriptive language
+       - Reformat source citations
+  5. Gemma 3 chat template wrapping
+  6. Write JSONL with a single `text` field
 
-Outputs:
-  gemma3_training.jsonl       — all 9800 records
-  gemma3_priority.jsonl       — only NeuraCare priority conditions
+Output:
+  gemma3_training.jsonl  — records with reasoning only (~7,273 expected)
 """
 
 import json
@@ -27,9 +29,8 @@ from pathlib import Path
 # Config
 # ---------------------------------------------------------------------------
 
-INPUT_FILE = Path("rare_disease_dataset.json")
-OUTPUT_ALL = Path("gemma3_training.jsonl")
-OUTPUT_PRIORITY = Path("gemma3_priority.jsonl")
+INPUT_FILE  = Path("neurological-conditions-queries.json")
+OUTPUT_FILE = Path("gemma3_training.jsonl")
 
 DISCLAIMER = (
     "Clinical decision support only — not a substitute for professional medical "
@@ -37,45 +38,44 @@ DISCLAIMER = (
     "appropriate specialists before making treatment decisions."
 )
 
-# NeuraCare priority condition keywords (case-insensitive)
-PRIORITY_KEYWORDS = [
-    "myasthenia gravis", r"\bMG\b",
-    r"\bALS\b", "amyotrophic lateral sclerosis",
-    "dravet",
-    r"\bCIDP\b", "chronic inflammatory demyelinating",
-    r"\bNMOSD\b", "neuromyelitis optica",
-]
-PRIORITY_PATTERN = re.compile(
-    "|".join(PRIORITY_KEYWORDS), re.IGNORECASE
-)
+# Max bullet points / sentences to extract for Key Considerations
+MAX_CONSIDERATIONS = 4
 
-# Prescriptive → NeuraCare-safe replacements (order matters — longer phrases first)
+# ---------------------------------------------------------------------------
+# NeuraCare style rules
+# ---------------------------------------------------------------------------
+
+# Prescriptive → evidence-based replacements (longer phrases first)
 PRESCRIPTIVE_REPLACEMENTS = [
-    (r"\bI strongly recommend\b",        "evidence strongly suggests"),
-    (r"\bI recommend\b",                 "evidence suggests"),
-    (r"\bI suggest\b",                   "evidence suggests"),
-    (r"\byou should\b",                  "guidelines indicate"),
-    (r"\bshould be\b",                   "guidelines indicate"),
-    (r"\bmust be\b",                     "evidence suggests"),
-    (r"\bshould\b",                      "guidelines indicate"),
-    (r"\bmust\b",                        "evidence suggests"),
-    (r"\bit is essential to\b",          "evidence suggests"),
-    (r"\bit is necessary to\b",          "guidelines indicate"),
-    (r"\bpatients need to\b",            "patients may consider"),
-    (r"\bpatients must\b",               "patients may"),
-    (r"\bpatients should\b",             "patients may"),
+    (r"\bI strongly recommend\b",   "evidence strongly suggests"),
+    (r"\bI recommend\b",            "evidence suggests"),
+    (r"\bI suggest\b",              "evidence suggests"),
+    (r"\byou should\b",             "guidelines indicate"),
+    (r"\bshould be\b",              "guidelines indicate"),
+    (r"\bmust be\b",                "evidence suggests"),
+    (r"\bshould\b",                 "guidelines indicate"),
+    (r"\bmust\b",                   "evidence suggests"),
+    (r"\bit is essential to\b",     "evidence suggests"),
+    (r"\bit is necessary to\b",     "guidelines indicate"),
+    (r"\bpatients need to\b",       "patients may consider"),
+    (r"\bpatients must\b",          "patients may"),
+    (r"\bpatients should\b",        "patients may"),
 ]
 
-# Source citation pattern: look for parenthetical refs like (Smith et al., 2020)
-# or inline refs like "according to the 2021 guidelines"
-CITATION_INLINE = re.compile(
-    r'\(([A-Z][^)]*?\d{4}[^)]*?)\)',   # (Author et al., Year) style
-)
+# Citation patterns
+CITATION_INLINE = re.compile(r'\(([A-Z][^)]*?\d{4}[^)]*?)\)')
 CITATION_GUIDELINE = re.compile(
-    r'(?:according to|per|based on)\s+(?:the\s+)?(\d{4}\s+\w[^,.]+(?:guidelines?|criteria|consensus|statement|protocol))',
+    r'(?:according to|per|based on)\s+(?:the\s+)?'
+    r'(\d{4}\s+\w[^,.]+(?:guidelines?|criteria|consensus|statement|protocol))',
     re.IGNORECASE,
 )
 
+# Markdown bullet/list line
+BULLET_LINE = re.compile(r'^\s*[-*•]\s+(.+)$')
+# Numbered list line
+NUMBERED_LINE = re.compile(r'^\s*\d+[.)]\s+(.+)$')
+# Markdown header or blockquote — skip these
+SKIP_LINE = re.compile(r'^\s*(#{1,6}\s|>|\*{3,}|-{3,}|`)')
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -84,9 +84,7 @@ CITATION_GUIDELINE = re.compile(
 def difficulty_to_confidence(difficulty) -> str:
     if difficulty in (2, 3):
         return "HIGH"
-    if difficulty in (4, 5):
-        return "MODERATE"
-    return "MODERATE"  # None / missing
+    return "MODERATE"  # covers 4, 5, and None
 
 
 def strip_prescriptive(text: str) -> str:
@@ -96,67 +94,96 @@ def strip_prescriptive(text: str) -> str:
 
 
 def reformat_citations(text: str) -> str:
-    """Wrap detected citations in [Source: ...] markers."""
-    def fmt_parens(m):
-        return f"[Source: {m.group(1).strip()}]"
-
-    def fmt_guideline(m):
-        return f"[Source: {m.group(1).strip()}]"
-
-    text = CITATION_INLINE.sub(fmt_parens, text)
+    text = CITATION_INLINE.sub(
+        lambda m: f"[Source: {m.group(1).strip()}]", text
+    )
     text = CITATION_GUIDELINE.sub(
-        lambda m: m.group(0).replace(m.group(1), f"[Source: {m.group(1).strip()}]"),
+        lambda m: m.group(0).replace(
+            m.group(1), f"[Source: {m.group(1).strip()}]"
+        ),
         text,
     )
     return text
 
 
-def inject_neuracare_style(answer: str, difficulty) -> str:
-    answer = strip_prescriptive(answer)
-    answer = reformat_citations(answer)
+def extract_key_considerations(answer: str, max_items: int = MAX_CONSIDERATIONS) -> str:
+    """
+    Distil the answer into a short bulleted Key Considerations block.
 
+    Strategy (in order):
+      1. Pull the first `max_items` markdown bullet / numbered-list items.
+      2. If fewer than 2 bullets found, fall back to the first 2 plain sentences.
+
+    Returns a formatted bullet string.
+    """
+    bullets = []
+    for line in answer.splitlines():
+        if SKIP_LINE.match(line):
+            continue
+        m = BULLET_LINE.match(line) or NUMBERED_LINE.match(line)
+        if m:
+            content = m.group(1).strip()
+            # Strip inline markdown bold/italic
+            content = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', content)
+            content = re.sub(r'`([^`]+)`', r'\1', content)
+            if content:
+                bullets.append(content)
+        if len(bullets) >= max_items:
+            break
+
+    # Fallback: first 2 sentences from plain prose
+    if len(bullets) < 2:
+        sentences = re.split(r'(?<=[.!?])\s+', re.sub(r'\s+', ' ', answer).strip())
+        bullets = [s.strip() for s in sentences if len(s.strip()) > 20][:max_items]
+
+    if not bullets:
+        bullets = [answer.strip()[:300]]
+
+    return "\n".join(f"- {b}" for b in bullets)
+
+
+def build_model_output(reasoning: str, answer: str, difficulty) -> str:
+    """
+    Compose the full model turn:
+      Clinical Reasoning: {cleaned CoT}
+      Key Considerations: {distilled bullets}
+      CONFIDENCE: ...
+      {disclaimer}
+    """
+    clean_reasoning = strip_prescriptive(reformat_citations(reasoning.strip()))
+    raw_considerations = extract_key_considerations(answer)
+    clean_considerations = strip_prescriptive(reformat_citations(raw_considerations))
     confidence = difficulty_to_confidence(difficulty)
-    answer = answer.rstrip()
-    answer += f"\n\nCONFIDENCE: {confidence}\n\n{DISCLAIMER}"
-    return answer
 
-
-def build_output_with_reasoning(reasoning: str | None, answer: str) -> str:
-    if reasoning:
-        cleaned_reasoning = strip_prescriptive(reasoning.strip())
-        return f"Reasoning:\n{cleaned_reasoning}\n\nResponse:\n{answer.strip()}"
-    return answer.strip()
-
-
-def to_gemma3_text(question: str, output: str) -> str:
-    """
-    Wrap into Gemma 3 chat template:
-      <start_of_turn>user
-      {question}<end_of_turn>
-      <start_of_turn>model
-      {output}<end_of_turn>
-    """
     return (
-        f"<start_of_turn>user\n{question.strip()}<end_of_turn>\n"
-        f"<start_of_turn>model\n{output.strip()}<end_of_turn>"
+        f"Clinical Reasoning:\n{clean_reasoning}\n\n"
+        f"Key Considerations:\n{clean_considerations}\n\n"
+        f"CONFIDENCE: {confidence}\n\n"
+        f"{DISCLAIMER}"
     )
 
 
-def is_priority(record: dict) -> bool:
-    combined = record.get("question", "") + " " + record.get("metadata", {}).get("topic", "")
-    return bool(PRIORITY_PATTERN.search(combined))
+def to_gemma3_text(question: str, model_output: str) -> str:
+    return (
+        f"<start_of_turn>user\n{question.strip()}<end_of_turn>\n"
+        f"<start_of_turn>model\n{model_output.strip()}<end_of_turn>"
+    )
 
 
-def convert_record(record: dict) -> dict:
-    question  = record["question"]
-    answer    = record["answer"]
+def convert_record(record: dict) -> dict | None:
     metadata  = record.get("metadata", {})
     reasoning = metadata.get("reasoning")
+
+    # Drop records with no reasoning — nothing to teach
+    if not reasoning or not reasoning.strip():
+        return None
+
+    question   = record["question"]
+    answer     = record["answer"]
     difficulty = metadata.get("difficulty")
 
-    styled_answer = inject_neuracare_style(answer, difficulty)
-    full_output   = build_output_with_reasoning(reasoning, styled_answer)
-    text          = to_gemma3_text(question, full_output)
+    model_output = build_model_output(reasoning, answer, difficulty)
+    text = to_gemma3_text(question, model_output)
 
     return {"text": text}
 
@@ -174,32 +201,45 @@ def main():
     with INPUT_FILE.open() as f:
         data = json.load(f)
 
-    print(f"Converting {len(data)} records...")
+    print(f"Processing {len(data)} records...")
 
-    all_count = 0
-    priority_count = 0
+    written   = 0
+    dropped   = 0
 
-    with OUTPUT_ALL.open("w") as f_all, OUTPUT_PRIORITY.open("w") as f_pri:
+    with OUTPUT_FILE.open("w") as out:
         for record in data:
             converted = convert_record(record)
-            line = json.dumps(converted, ensure_ascii=False)
-
-            f_all.write(line + "\n")
-            all_count += 1
-
-            if is_priority(record):
-                f_pri.write(line + "\n")
-                priority_count += 1
+            if converted is None:
+                dropped += 1
+                continue
+            out.write(json.dumps(converted, ensure_ascii=False) + "\n")
+            written += 1
 
     print(f"\nDone.")
-    print(f"  {OUTPUT_ALL}       — {all_count} records")
-    print(f"  {OUTPUT_PRIORITY}   — {priority_count} priority records")
+    print(f"  Written : {written}")
+    print(f"  Dropped (no reasoning): {dropped}")
+    print(f"  Output  : {OUTPUT_FILE}")
 
-    # Show a sample
-    print("\n--- Sample output (first record) ---")
-    with OUTPUT_ALL.open() as f:
+    # Validation pass
+    print("\nRunning validation...")
+    issues = 0
+    with OUTPUT_FILE.open() as f:
+        for i, line in enumerate(f):
+            r = json.loads(line)
+            t = r["text"]
+            for marker in ["<start_of_turn>user", "<start_of_turn>model",
+                           "<end_of_turn>", "Clinical Reasoning:",
+                           "Key Considerations:", "CONFIDENCE:"]:
+                if marker not in t:
+                    print(f"  Record {i}: missing '{marker}'")
+                    issues += 1
+    print(f"  Issues found: {issues}")
+
+    # Sample output
+    print("\n--- Sample output ---")
+    with OUTPUT_FILE.open() as f:
         sample = json.loads(f.readline())
-    print(sample["text"][:800])
+    print(sample["text"][:1000])
     print("...")
 
 
