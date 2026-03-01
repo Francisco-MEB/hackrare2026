@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     # doctor_model: str = "hf.co/slplayford/neuro-gemma3-12b:Q8_0"
     # patient_model: str = "hf.co/slplayford/neuro-gemma3-12b:Q8_0"
-    doctor_model: str = "gemma3:12b"
+    doctor_model: str = "doctor-chatbot"
     patient_model: str = "gemma3:12b" 
     ollama_embed_model: str = "nomic-embed-text:latest"  
 

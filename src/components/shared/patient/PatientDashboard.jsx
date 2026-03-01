@@ -1,6 +1,6 @@
 import { theme } from "../../../theme";
 
-export default function PatientDashboard() {
+export default function PatientDashboard({ onNavigate }) {
   const meds = [
     { name: "Gabapentin 300mg", time: "8:00 AM", done: true },
     { name: "Vitamin D 2000IU", time: "8:00 AM", done: true },
@@ -22,6 +22,38 @@ export default function PatientDashboard() {
       <p style={{ color: theme.textMuted, fontSize: "clamp(12px, 1.1vw, 16px)", marginBottom: "clamp(18px, 2.5vh, 36px)" }}>
         Saturday, Feb 28 · Here's your overview for today
       </p>
+
+      {/* Symptom log CTA */}
+      <div
+        onClick={() => onNavigate("symptoms")}
+        style={{
+          background: theme.accent, borderRadius: "clamp(10px, 1vw, 16px)",
+          padding: "clamp(16px, 2vh, 24px) clamp(18px, 2vw, 28px)",
+          marginBottom: "clamp(16px, 2vh, 28px)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          cursor: "pointer", boxShadow: `0 6px 28px rgba(232,130,74,0.35)`,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "clamp(12px, 1.2vw, 18px)" }}>
+          <span style={{ fontSize: "clamp(22px, 2.2vw, 32px)", filter: "grayscale(1)" }}>📋</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: "clamp(14px, 1.4vw, 20px)", color: "white", marginBottom: "2px" }}>
+              Haven't logged your symptoms today?
+            </p>
+            <p style={{ fontSize: "clamp(11px, 1vw, 15px)", color: "rgba(255,255,255,0.8)" }}>
+              Daily logging is the most important thing you can do — your care team depends on it.
+            </p>
+          </div>
+        </div>
+        <div style={{
+          background: "white", color: theme.accent,
+          fontWeight: 700, fontSize: "clamp(12px, 1.1vw, 16px)",
+          padding: "clamp(8px, 1vh, 12px) clamp(16px, 1.6vw, 22px)",
+          borderRadius: "clamp(8px, 0.8vw, 12px)", flexShrink: 0, whiteSpace: "nowrap",
+        }}>
+          Log Now →
+        </div>
+      </div>
 
       {/* Flare alert */}
       <div style={{

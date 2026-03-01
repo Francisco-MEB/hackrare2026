@@ -47,7 +47,7 @@ export default function App() {
 
   const renderContent = () => {
     if (role === "patient") {
-      if (tab === "home")     return <PatientDashboard />;
+      if (tab === "home")     return <PatientDashboard onNavigate={setTab} />;
       if (tab === "symptoms") return <SymptomTracker />;
       if (tab === "devices")  return <DeviceData />;
 
